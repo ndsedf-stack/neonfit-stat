@@ -1,92 +1,349 @@
-
 <!DOCTYPE html>
 <html lang="fr">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Neon Fitness Tracker 3D</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-              display: ['Orbitron', 'sans-serif'],
-            },
-            colors: {
-              bg: '#020202',
-              card: '#080808',
-            },
-            animation: {
-              'spin-slow': 'spin 30s linear infinite',
-              'spin-reverse-slow': 'spin 35s linear infinite reverse',
-              'scan': 'scan 4s ease-in-out infinite',
-              'float': 'float 6s ease-in-out infinite',
-              'pulse-fast': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-            },
-            keyframes: {
-              scan: {
-                '0%, 100%': { transform: 'translateY(-20%)', opacity: '0' },
-                '50%': { transform: 'translateY(400px)', opacity: '0.5' },
-              },
-              float: {
-                '0%, 100%': { transform: 'translateY(0px) rotateX(10deg)' },
-                '50%': { transform: 'translateY(-20px) rotateX(15deg)' },
-              },
-              slideIn: {
-                '0%': { transform: 'translateX(20px)', opacity: '0' },
-                '100%': { transform: 'translateX(0)', opacity: '1' },
-              }
-            },
-            boxShadow: {
-              'neon-blue': '0 0 10px rgba(6,182,212,0.5), 0 0 20px rgba(6,182,212,0.3)',
-              'neon-purple': '0 0 10px rgba(139,92,246,0.5), 0 0 20px rgba(139,92,246,0.3)',
-              'metal-pressed': 'inset 2px 2px 5px #000000, inset -2px -2px 5px rgba(255,255,255,0.1)',
-            },
-            backgroundImage: {
-              'mesh': 'radial-gradient(circle at 50% 50%, rgba(255,255,255,0.03) 1px, transparent 1px)',
-            }
-          }
-        }
-      }
-    </script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-      body {
-        background-color: #020202;
-        color: white;
-      }
-      .perspective-container {
-        perspective: 1500px;
-      }
-      .preserve-3d {
-        transform-style: preserve-3d;
-      }
-      .backface-hidden {
-        backface-visibility: hidden;
-      }
-      /* Hide Scrollbar */
-      .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-      }
-      .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-      }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #020202;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+        
+        .neon-glow {
+            text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff;
+        }
+        
+        .card-glow {
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+        }
+        
+        @keyframes scan {
+            0%, 100% { transform: translateY(-100%); opacity: 0; }
+            50% { opacity: 0.3; }
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 1; }
+            50% { transform: scale(1); opacity: 0.7; }
+            100% { transform: scale(0.95); opacity: 1; }
+        }
+        
+        .animate-scan {
+            animation: scan 4s ease-in-out infinite;
+        }
+        
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        .animate-pulse-ring {
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
-  }
-}
-</script>
 </head>
-  <body>
+<body>
     <div id="root"></div>
-  </body>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Icons Component
+        const RotateCcw = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M1 4v6h6M23 20v-6h-6"/>
+                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+            </svg>
+        );
+
+        const Power = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.77.04"/>
+            </svg>
+        );
+
+        const Fingerprint = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M2 12C2 6.5 6.5 2 12 2a10 10 0 0 1 8 4"/>
+                <path d="M5 19.5C5.5 18 6 15 6 12c0-.7.12-1.37.34-2"/>
+                <path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/>
+                <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/>
+                <path d="M8.65 22c.21-.66.45-1.32.57-2"/>
+                <path d="M14 13.12c0 2.38 0 6.38-1 8.88"/>
+                <path d="M2 16h.01M21.8 16c.2-2 .131-5.354 0-6"/>
+                <path d="M9 6.8a6 6 0 0 1 9 5.2c0 .47 0 1.17-.02 2"/>
+            </svg>
+        );
+
+        // Main App Component
+        function App() {
+            const [loading, setLoading] = useState(true);
+            const [bootStep, setBootStep] = useState(0);
+            const [score, setScore] = useState(84);
+            const [sessions, setSessions] = useState(4);
+            const [maxSessions, setMaxSessions] = useState(5);
+            const [sets, setSets] = useState(45);
+            const [maxSets, setMaxSets] = useState(60);
+            const [volume, setVolume] = useState(18500);
+
+            useEffect(() => {
+                if (!loading) return;
+                
+                const timeouts = [
+                    setTimeout(() => setBootStep(1), 500),
+                    setTimeout(() => setBootStep(2), 1200),
+                    setTimeout(() => setBootStep(3), 2000),
+                    setTimeout(() => setLoading(false), 2800),
+                ];
+                return () => timeouts.forEach(clearTimeout);
+            }, [loading]);
+
+            const resetDemo = () => {
+                setLoading(true);
+                setBootStep(0);
+                setScore(0);
+                setSessions(0);
+                setSets(0);
+                setVolume(0);
+                
+                setTimeout(() => {
+                    setScore(84);
+                    setSessions(4);
+                    setSets(45);
+                    setVolume(18500);
+                }, 2800);
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen bg-black flex items-center justify-center relative overflow-hidden">
+                        {/* Scanning Line Effect */}
+                        <div className="absolute inset-0 pointer-events-none">
+                            <div className="absolute w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent animate-scan"></div>
+                        </div>
+                        
+                        {/* Grid Background */}
+                        <div className="absolute inset-0 opacity-20">
+                            <div style={{
+                                backgroundImage: 'linear-gradient(#00ffff 1px, transparent 1px), linear-gradient(90deg, #00ffff 1px, transparent 1px)',
+                                backgroundSize: '50px 50px'
+                            }}></div>
+                        </div>
+
+                        <div className="text-center z-10">
+                            <div className="mb-8">
+                                <Fingerprint />
+                            </div>
+                            
+                            <h1 className="text-4xl font-bold mb-8 neon-glow" style={{fontFamily: 'Orbitron'}}>
+                                NEON FITNESS
+                            </h1>
+                            
+                            <div className="space-y-4 text-cyan-400 font-mono">
+                                <div className={`transition-opacity duration-500 ${bootStep >= 1 ? 'opacity-100' : 'opacity-0'}`}>
+                                    {'>'} SYSTEM INITIALIZED
+                                </div>
+                                <div className={`transition-opacity duration-500 ${bootStep >= 2 ? 'opacity-100' : 'opacity-0'}`}>
+                                    {'>'} BIOMETRIC AUTH VERIFIED
+                                </div>
+                                <div className={`transition-opacity duration-500 ${bootStep >= 3 ? 'opacity-100' : 'opacity-0'}`}>
+                                    {'>'} NEURAL LINK ESTABLISHED
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white p-4 md:p-8">
+                    {/* Header */}
+                    <div className="max-w-7xl mx-auto mb-8">
+                        <div className="flex justify-between items-center">
+                            <h1 className="text-3xl md:text-4xl font-bold neon-glow" style={{fontFamily: 'Orbitron'}}>
+                                NEON FITNESS
+                            </h1>
+                            <button 
+                                onClick={resetDemo}
+                                className="flex items-center gap-2 px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500 rounded-lg transition-all"
+                            >
+                                <RotateCcw />
+                                <span>RESET</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Main Grid */}
+                    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Central Score Display */}
+                        <div className="lg:col-span-2 card-glow bg-black/40 backdrop-blur-sm rounded-2xl p-8 border border-cyan-500/30">
+                            <div className="text-center mb-8">
+                                <div className="text-6xl md:text-8xl font-bold mb-4 neon-glow animate-pulse-ring" style={{fontFamily: 'Orbitron'}}>
+                                    {score}
+                                </div>
+                                <div className="text-xl text-cyan-400 uppercase tracking-widest">
+                                    Recovery Score
+                                </div>
+                            </div>
+                            
+                            {/* Progress Rings */}
+                            <div className="flex justify-around items-center gap-4">
+                                <div className="text-center">
+                                    <div className="relative w-24 h-24 mx-auto mb-2">
+                                        <svg className="transform -rotate-90" width="96" height="96">
+                                            <circle cx="48" cy="48" r="44" fill="none" stroke="#1a1a1a" strokeWidth="8"/>
+                                            <circle 
+                                                cx="48" cy="48" r="44" 
+                                                fill="none" 
+                                                stroke="#00ffff" 
+                                                strokeWidth="8"
+                                                strokeDasharray={`${(sessions/maxSessions) * 276} 276`}
+                                                className="transition-all duration-1000"
+                                            />
+                                        </svg>
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <span className="text-2xl font-bold text-cyan-400">{sessions}</span>
+                                        </div>
+                                    </div>
+                                    <div className="text-sm text-gray-400">SESSIONS</div>
+                                    <div className="text-xs text-cyan-400">{sessions}/{maxSessions}</div>
+                                </div>
+
+                                <div className="text-center">
+                                    <div className="relative w-24 h-24 mx-auto mb-2">
+                                        <svg className="transform -rotate-90" width="96" height="96">
+                                            <circle cx="48" cy="48" r="44" fill="none" stroke="#1a1a1a" strokeWidth="8"/>
+                                            <circle 
+                                                cx="48" cy="48" r="44" 
+                                                fill="none" 
+                                                stroke="#06b6d4" 
+                                                strokeWidth="8"
+                                                strokeDasharray={`${(sets/maxSets) * 276} 276`}
+                                                className="transition-all duration-1000"
+                                            />
+                                        </svg>
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <span className="text-2xl font-bold text-cyan-400">{sets}</span>
+                                        </div>
+                                    </div>
+                                    <div className="text-sm text-gray-400">SETS</div>
+                                    <div className="text-xs text-cyan-400">{sets}/{maxSets}</div>
+                                </div>
+
+                                <div className="text-center">
+                                    <div className="relative w-24 h-24 mx-auto mb-2">
+                                        <svg className="transform -rotate-90" width="96" height="96">
+                                            <circle cx="48" cy="48" r="44" fill="none" stroke="#1a1a1a" strokeWidth="8"/>
+                                            <circle 
+                                                cx="48" cy="48" r="44" 
+                                                fill="none" 
+                                                stroke="#0891b2" 
+                                                strokeWidth="8"
+                                                strokeDasharray={`${(volume/25000) * 276} 276`}
+                                                className="transition-all duration-1000"
+                                            />
+                                        </svg>
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <span className="text-xl font-bold text-cyan-400">{(volume/1000).toFixed(1)}k</span>
+                                        </div>
+                                    </div>
+                                    <div className="text-sm text-gray-400">VOLUME</div>
+                                    <div className="text-xs text-cyan-400">kg lifted</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Side Stats */}
+                        <div className="space-y-6">
+                            {/* Muscle Groups */}
+                            <div className="card-glow bg-black/40 backdrop-blur-sm rounded-2xl p-6 border border-cyan-500/30">
+                                <h3 className="text-lg font-bold mb-4 text-cyan-400 uppercase">Muscle Groups</h3>
+                                <div className="space-y-3">
+                                    {[
+                                        { name: 'Chest', value: 85 },
+                                        { name: 'Back', value: 72 },
+                                        { name: 'Legs', value: 90 },
+                                        { name: 'Arms', value: 68 }
+                                    ].map((muscle, i) => (
+                                        <div key={i}>
+                                            <div className="flex justify-between text-sm mb-1">
+                                                <span className="text-gray-400">{muscle.name}</span>
+                                                <span className="text-cyan-400">{muscle.value}%</span>
+                                            </div>
+                                            <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                                                <div 
+                                                    className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-1000"
+                                                    style={{width: `${muscle.value}%`}}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Weekly Progress */}
+                            <div className="card-glow bg-black/40 backdrop-blur-sm rounded-2xl p-6 border border-cyan-500/30">
+                                <h3 className="text-lg font-bold mb-4 text-cyan-400 uppercase">Weekly</h3>
+                                <div className="flex justify-around items-end h-32">
+                                    {[65, 80, 70, 90, 75, 85, 95].map((height, i) => (
+                                        <div key={i} className="flex flex-col items-center gap-2">
+                                            <div 
+                                                className="w-8 bg-gradient-to-t from-cyan-500 to-blue-500 rounded-t transition-all duration-1000"
+                                                style={{height: `${height}%`}}
+                                            ></div>
+                                            <span className="text-xs text-gray-400">
+                                                {['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer Stats */}
+                    <div className="max-w-7xl mx-auto mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[
+                            { label: 'HEART RATE', value: '72 BPM', color: 'text-red-400' },
+                            { label: 'CALORIES', value: '2,450', color: 'text-orange-400' },
+                            { label: 'SLEEP', value: '7.5 HR', color: 'text-purple-400' },
+                            { label: 'HYDRATION', value: '85%', color: 'text-blue-400' }
+                        ].map((stat, i) => (
+                            <div key={i} className="card-glow bg-black/40 backdrop-blur-sm rounded-xl p-4 border border-cyan-500/20 text-center">
+                                <div className={`text-2xl font-bold ${stat.color} mb-1`} style={{fontFamily: 'Orbitron'}}>
+                                    {stat.value}
+                                </div>
+                                <div className="text-xs text-gray-400 uppercase tracking-wider">
+                                    {stat.label}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        // Render the app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
 </html>

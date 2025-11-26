@@ -1,0 +1,46 @@
+import React from 'react';
+import { 
+  Activity,
+  Heart,
+  Zap,
+  Flame,
+  Trophy,
+  Calendar,
+  Settings,
+  User,
+  Menu,
+  X,
+  Play,
+  Pause,
+  ChevronRight,
+  Target,
+  Bot,
+  Plus,
+  MessageSquare,
+  Trash2,
+  Download,
+  AlertCircle
+} from 'lucide-react';
+
+export const Icons = {
+  Activity,
+  Heart,
+  Zap,
+  Flame,
+  Trophy,
+  Calendar,
+  Settings,
+  User,
+  Menu,
+  X,
+  Play,
+  Pause,
+  ChevronRight,
+  Target,
+  Bot,
+  Plus,
+  MessageSquare,
+  Trash2,
+  Download,
+  AlertCircle
+};

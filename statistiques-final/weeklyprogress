@@ -1,0 +1,345 @@
+
+import React, { useEffect, useState, useRef } from 'react';
+import { Target, TrendingUp, Crosshair, Zap, Activity, Lock, CheckCircle2, Dumbbell, Brain, Info, X, Gauge } from 'lucide-react';
+
+// --- DATA STRUCTURE (From V12 - Deep Hypertrophy Data) ---
+interface HypertrophyWeek {
+  id: string;
+  label: string;
+  phase: string;        // Name of the phase (Accumulation, Peak...)
+  volume: number;       // Tonnage
+  intensity: number;    // %
+  rpeAvg: number;       // 1-10
+  effectiveReps: number;
+  fatigue: number;      // 0-100
+  status: 'success' | 'active' | 'locked';
+  angle: number;        // Radar position
+  color: string;        // Specific phase color
+}
+
+const WEEKS_DATA: HypertrophyWeek[] = [
+  { id: 's1', label: 'SEM 1', phase: 'ACTIVATION', volume: 28500, intensity: 75, rpeAvg: 7.5, effectiveReps: 140, fatigue: 40, status: 'success', angle: 225, color: '#22d3ee' }, // Cyan
+  { id: 's2', label: 'SEM 2', phase: 'ACCUMULATION', volume: 31200, intensity: 78, rpeAvg: 8.0, effectiveReps: 165, fatigue: 55, status: 'success', angle: 315, color: '#8b5cf6' }, // Violet
+  { id: 's3', label: 'SEM 3', phase: 'PEAK LOAD', volume: 33400, intensity: 85, rpeAvg: 8.5, effectiveReps: 190, fatigue: 75, status: 'active', angle: 45, color: '#d946ef' },   // Magenta
+  { id: 's4', label: 'SEM 4', phase: 'OVERREACH', volume: 35000, intensity: 90, rpeAvg: 9.5, effectiveReps: 210, fatigue: 92, status: 'locked', angle: 135, color: '#ef4444' }   // Red
+];
+
+export const WeeklyProgressV14: React.FC = () => {
+  const [activeWeek, setActiveWeek] = useState<HypertrophyWeek>(WEEKS_DATA[2]); // Default S3
+  const [scanAngle, setScanAngle] = useState(0);
+  const [showInfo, setShowInfo] = useState(false);
+  const [shockwaves, setShockwaves] = useState<{id: number, x: number, y: number, color: string}[]>([]);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // --- ANIMATION LOOPS ---
+  useEffect(() => {
+    const interval = setInterval(() => {
+        setScanAngle(prev => (prev + 1.5) % 360);
+    }, 20);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Particles System (Canvas) - The "Cockpit Atmosphere"
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const particles: Array<{x: number, y: number, r: number, speed: number, angle: number, dist: number}> = [];
+    for(let i=0; i<30; i++) {
+        particles.push({
+            x: 0, y: 0, 
+            r: Math.random() * 1.5, 
+            speed: 0.002 + Math.random() * 0.005, 
+            angle: Math.random() * Math.PI * 2, 
+            dist: 0.3 + Math.random() * 0.7
+        });
+    }
+
+    let animId: number;
+    const animate = () => {
+        const size = 380; 
+        ctx.clearRect(0, 0, size, size);
+        const cx = size / 2;
+        const cy = size / 2;
+        const rBase = size * 0.45;
+
+        particles.forEach(p => {
+            p.angle += p.speed;
+            const x = cx + Math.cos(p.angle) * (rBase * p.dist);
+            const y = cy + Math.sin(p.angle) * (rBase * p.dist);
+            ctx.fillStyle = `rgba(255, 255, 255, ${0.1 + Math.random() * 0.3})`;
+            ctx.beginPath();
+            ctx.arc(x, y, p.r, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        animId = requestAnimationFrame(animate);
+    };
+    animate();
+    return () => cancelAnimationFrame(animId);
+  }, []);
+
+  const handleNodeClick = (x: number, y: number, week: HypertrophyWeek) => {
+      setActiveWeek(week);
+      const newWave = { id: Date.now(), x, y, color: week.color };
+      setShockwaves(prev => [...prev, newWave]);
+      setTimeout(() => setShockwaves(prev => prev.filter(w => w.id !== newWave.id)), 1000);
+  };
+
+  // --- HELPERS ---
+  const getRadius = (i: number) => 15 + (i * 11); // Concentric expansion
+  const getCoord = (angle: number, radius: number) => {
+    const rad = (angle - 90) * Math.PI / 180; 
+    const x = 50 + radius * Math.cos(rad);
+    const y = 50 + radius * Math.sin(rad);
+    return { x, y };
+  };
+
+  const points = WEEKS_DATA.map((w, i) => getCoord(w.angle, getRadius(i)));
+  const pathData = `M ${points.map(p => `${p.x},${p.y}`).join(' L ')}`;
+
+  return (
+    <div className="relative w-full max-w-md bg-[#050505] border border-white/10 rounded-3xl flex flex-col transition-all duration-500 hover:border-cyan-500/20 hover:shadow-[0_0_60px_rgba(6,182,212,0.15)] z-20 overflow-hidden group min-h-[750px]">
+      
+      {/* 1. HEADER (Tactical + Info) */}
+      <div className="bg-[#050505] px-6 py-4 border-b border-white/10 z-10 flex justify-between items-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-cyan-900/5"></div>
+        <div>
+          <h2 className="font-display font-black text-white tracking-widest uppercase flex items-center gap-2 text-lg">
+            <Crosshair className="text-cyan-400 animate-[spin_10s_linear_infinite]" size={18} />
+            KINETIC.RADAR
+          </h2>
+          <p className="text-[10px] text-cyan-500/80 font-mono font-bold mt-1 flex items-center gap-1 animate-pulse">
+             HYPERTROPHY TRACKING ACTIVE
+          </p>
+        </div>
+        
+        <button 
+            onClick={() => setShowInfo(!showInfo)}
+            className="relative z-10 w-8 h-8 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500 transition-all"
+        >
+            {showInfo ? <X size={14} /> : <Info size={14} />}
+        </button>
+      </div>
+
+      {/* 2. VISUALIZER (The Kinetic Radar V11 Engine) */}
+      <div className="relative bg-[#020202] flex items-center justify-center p-2 h-[380px] overflow-hidden">
+        
+        {/* Background Grid */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(6,182,212,0.08)_0%,_transparent_70%)]"></div>
+        
+        {/* Particles Canvas */}
+        <canvas ref={canvasRef} width={380} height={380} className="absolute inset-0 w-full h-full pointer-events-none opacity-60" />
+
+        {/* Shockwaves */}
+        {shockwaves.map(wave => (
+            <div 
+                key={wave.id}
+                className="absolute border rounded-full animate-ping pointer-events-none"
+                style={{ 
+                    left: `${wave.x}%`, top: `${wave.y}%`, width: '20px', height: '20px', 
+                    transform: 'translate(-50%, -50%)', opacity: 0,
+                    borderColor: wave.color
+                }}
+            />
+        ))}
+
+        {/* --- MAIN SVG ENGINE --- */}
+        <svg className="relative w-full aspect-square max-w-[380px] z-10 overflow-visible" viewBox="0 0 100 100">
+            <defs>
+                <linearGradient id="radarBeamV14" x1="0.5" y1="0.5" x2="1" y2="0.5" gradientTransform={`rotate(${scanAngle}, 0.5, 0.5)`}>
+                    <stop offset="0%" stopColor="rgba(34, 211, 238, 0)" />
+                    <stop offset="100%" stopColor="rgba(34, 211, 238, 0.15)" />
+                </linearGradient>
+                <filter id="glowPathV14"><feGaussianBlur stdDeviation="0.6" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+
+            {/* SCANNING BEAM */}
+            <circle cx="50" cy="50" r="48" fill="url(#radarBeamV14)" className="pointer-events-none" />
+
+            {/* KINETIC RINGS (One per week, rotating) */}
+            {WEEKS_DATA.map((week, i) => {
+                const r = getRadius(i);
+                const animSpeed = 25 + (i * 10);
+                const animDir = i % 2 === 0 ? '' : 'reverse';
+                const isActive = activeWeek.id === week.id;
+                
+                return (
+                    <g key={`ring-${i}`} className="origin-center" style={{ animation: `spin ${animSpeed}s linear infinite ${animDir}` }}>
+                        <circle 
+                            cx="50" cy="50" r={r} 
+                            fill="none" 
+                            stroke={week.color} 
+                            strokeWidth="0.3" 
+                            strokeDasharray={isActive ? 'none' : '2 4'} 
+                            opacity={isActive ? 0.8 : 0.2}
+                        />
+                        {isActive && <circle cx="50" cy={50 - r} r="0.8" fill={week.color} opacity="0.8" />}
+                    </g>
+                );
+            })}
+
+            {/* AXIS */}
+            <g opacity="0.1" stroke="#fff" strokeWidth="0.2">
+                <line x1="50" y1="0" x2="50" y2="100" />
+                <line x1="0" y1="50" x2="100" y2="50" />
+            </g>
+
+            {/* CONNECTING LASER PATH */}
+            <path 
+                d={pathData} 
+                fill="none" 
+                stroke="#22d3ee" 
+                strokeWidth="1" 
+                filter="url(#glowPathV14)"
+                strokeDasharray="200"
+                className="transition-all duration-[2000ms] ease-out opacity-40"
+            />
+
+            {/* NODES (Interactive) */}
+            {WEEKS_DATA.map((week, i) => {
+                const pos = points[i];
+                const isSelected = activeWeek.id === week.id;
+                
+                return (
+                    <g 
+                        key={week.id} 
+                        onClick={() => handleNodeClick(pos.x, pos.y, week)} 
+                        className="cursor-pointer group"
+                    >
+                        {/* Pulse Halo */}
+                        {(isSelected) && (
+                            <circle cx={pos.x} cy={pos.y} r="6" fill="none" stroke={week.color} strokeWidth="0.3" opacity="0.5">
+                                <animate attributeName="r" values="3;8;3" dur="2s" repeatCount="indefinite" />
+                                <animate attributeName="opacity" values="0.8;0;0.8" dur="2s" repeatCount="indefinite" />
+                            </circle>
+                        )}
+
+                        {/* Core Node */}
+                        <circle 
+                            cx={pos.x} 
+                            cy={pos.y} 
+                            r={isSelected ? 4 : 2.5} 
+                            fill={isSelected ? '#fff' : '#000'}
+                            stroke={week.color}
+                            strokeWidth={1.5}
+                            className="transition-all duration-300 ease-out"
+                        />
+                    </g>
+                );
+            })}
+        </svg>
+
+        {/* CENTER SCORE */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none">
+            <div className="text-[8px] font-mono text-gray-500 uppercase tracking-widest mb-1">RPE AVG</div>
+            <div className="text-4xl font-black text-white leading-none drop-shadow-lg" style={{color: activeWeek.color}}>
+                {activeWeek.rpeAvg}
+            </div>
+        </div>
+
+        {/* --- INFO OVERLAY --- */}
+        {showInfo && (
+            <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-md p-6 flex flex-col justify-center animate-[fadeIn_0.3s_ease-out]">
+                <h3 className="text-white font-display font-bold text-lg mb-4 border-b border-white/20 pb-2">GLOSSAIRE</h3>
+                <div className="space-y-3">
+                    <InfoItem label="RPE (Effort)" desc="Difficulté perçue sur 10. Cible: 8-9." color="text-yellow-400" />
+                    <InfoItem label="EFF. REPS" desc="Répétitions proches de l'échec." color="text-fuchsia-400" />
+                    <InfoItem label="FATIGUE" desc="Impact nerveux. Danger si > 90%." color="text-red-400" />
+                </div>
+                <div className="mt-6 text-center text-xs text-gray-500 font-mono">tap to close</div>
+            </div>
+        )}
+      </div>
+
+      {/* 3. DATA PANEL (Deep V12 Data integrated) */}
+      <div className="flex-1 bg-[#0a0a0a] border-t border-white/10 p-5 relative z-10">
+          
+          {/* Header of Data Panel */}
+          <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-3">
+                  <div className="w-1.5 h-8 rounded-full" style={{backgroundColor: activeWeek.color, boxShadow: `0 0 10px ${activeWeek.color}`}}></div>
+                  <div>
+                      <h3 className="text-white font-display font-bold text-xl tracking-wide leading-none">{activeWeek.label}</h3>
+                      <p className="text-[10px] font-mono uppercase mt-1" style={{color: activeWeek.color}}>
+                          {activeWeek.phase}
+                      </p>
+                  </div>
+              </div>
+              <div className="text-right">
+                  <div className="text-2xl font-black text-white">{(activeWeek.volume / 1000).toFixed(1)}<span className="text-sm text-gray-600">k</span></div>
+                  <div className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Volume</div>
+              </div>
+          </div>
+
+          {/* METRICS GRID */}
+          <div className="grid grid-cols-3 gap-3 mb-4">
+              <StatBox 
+                label="RPE Avg" 
+                value={activeWeek.rpeAvg} 
+                sub="/ 10" 
+                icon={Gauge} 
+                color={activeWeek.rpeAvg > 8 ? "text-yellow-400" : "text-white"}
+                barColor={activeWeek.rpeAvg > 8 ? "bg-yellow-500" : "bg-blue-500"}
+                progress={activeWeek.rpeAvg * 10}
+              />
+              <StatBox 
+                label="Eff. Reps" 
+                value={activeWeek.effectiveReps} 
+                sub="Total" 
+                icon={Dumbbell} 
+                color="text-fuchsia-400"
+                barColor="bg-fuchsia-500"
+                progress={(activeWeek.effectiveReps / 250) * 100}
+              />
+              <StatBox 
+                label="Fatigue" 
+                value={`${activeWeek.fatigue}%`} 
+                sub="Systemic" 
+                icon={Activity} 
+                color={activeWeek.fatigue > 80 ? "text-red-500" : "text-emerald-400"}
+                barColor={activeWeek.fatigue > 80 ? "bg-red-500" : "bg-emerald-500"}
+                progress={activeWeek.fatigue}
+              />
+          </div>
+
+          {/* INSIGHT MESSAGE (From V12) */}
+          <div className="bg-white/5 border border-white/5 rounded-lg p-3 flex items-start gap-3">
+              <Zap className="text-yellow-400 shrink-0 mt-0.5" size={14} />
+              <div className="text-xs text-gray-300 leading-relaxed">
+                  {activeWeek.rpeAvg > 8.5 
+                    ? "Haute intensité détectée. Le stimulus hypertrophique est maximal, mais surveillez la récupération nerveuse."
+                    : "Volume d'accumulation solide. Vous êtes dans la zone optimale pour la croissance métabolique."}
+              </div>
+          </div>
+      </div>
+
+    </div>
+  );
+}
+
+const InfoItem = ({ label, desc, color }: any) => (
+    <div className="flex gap-3">
+        <div className={`w-1 h-full rounded-full bg-current opacity-50 ${color}`}></div>
+        <div>
+            <div className={`font-bold text-sm ${color} mb-0.5`}>{label}</div>
+            <div className="text-xs text-gray-400 leading-snug">{desc}</div>
+        </div>
+    </div>
+);
+
+const StatBox = ({ label, value, sub, icon: Icon, color, barColor, progress }: any) => (
+    <div className="bg-[#111] rounded-xl p-3 border border-white/5 relative overflow-hidden group hover:border-white/10 transition-all">
+        <div className="flex justify-between items-start mb-2">
+            <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">{label}</span>
+            <Icon size={12} className="text-gray-600 group-hover:text-white transition-colors"/>
+        </div>
+        <div className={`text-lg font-display font-bold leading-none mb-2 ${color}`}>
+            {value} <span className="text-[8px] text-gray-600 font-sans font-normal">{sub}</span>
+        </div>
+        <div className="h-1 w-full bg-gray-800 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full ${barColor}`} style={{width: `${progress}%`}}></div>
+        </div>
+    </div>
+);

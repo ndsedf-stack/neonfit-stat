@@ -1,0 +1,482 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeonFit - Statistics Hub</title>
+    
+    <!-- 1. TAILWIND CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. FONTS (Orbitron for HUD, Inter for UI) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+    
+    <!-- 3. CONFIGURATION TAILWIND -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              neon: { cyan: '#06b6d4', magenta: '#d946ef', lime: '#84cc16' }
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+              display: ['Orbitron', 'sans-serif'],
+            },
+            animation: {
+              'spin-slow': 'spin 10s linear infinite',
+              'spin-reverse-slow': 'spin 15s linear infinite reverse',
+              'slideIn': 'slideIn 0.5s ease-out forwards',
+              'shimmer': 'shimmer 2s infinite',
+              'scan': 'scan 4s ease-in-out infinite',
+              'fade-in': 'fadeIn 0.3s ease-out forwards',
+            },
+            keyframes: {
+              slideIn: {
+                '0%': { opacity: '0', transform: 'translateY(20px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              shimmer: {
+                '0%': { transform: 'translateX(-100%)' },
+                '100%': { transform: 'translateX(100%)' },
+              },
+              scan: {
+                '0%, 100%': { transform: 'translateY(-100%)', opacity: '0' },
+                '50%': { opacity: '0.3' }
+              },
+              fadeIn: {
+                '0%': { opacity: '0', transform: 'scale(0.95)' },
+                '100%': { opacity: '1', transform: 'scale(1)' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+
+    <!-- 4. IMPORT MAP (React & Lucide depuis le navigateur) -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.300.0"
+      }
+    }
+    </script>
+    
+    <!-- 5. BABEL (Pour compiler le JSX dans le navigateur) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body { background: #010101; color: #fff; overflow-x: hidden; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- APPLICATION LOGIC -->
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useRef, useMemo } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { 
+            Activity, Heart, Zap, Flame, Trophy, Calendar, Settings, User, 
+            Menu, X, Play, Pause, ChevronRight, Target, Bot, Plus, 
+            MessageSquare, Trash2, Download, AlertCircle, TrendingUp,
+            Layers, Clock, Battery, Fan, Disc, Dumbbell, Maximize2, RefreshCw, Cpu,
+            RotateCcw, Power, Fingerprint, Hexagon, Award, Shield, Repeat, Crosshair, Info, Lock, CheckCircle2, Gauge
+        } from 'lucide-react';
+
+        // --- MOCK DATA ---
+        const ZONES = [
+            { id: 'force', label: 'FORCE', range: '1-5 RM', percent: 15, sets: 6, color: 'bg-amber-500', shadow: 'shadow-amber-500/50' },
+            { id: 'hyper', label: 'HYPERTROPHIE', range: '6-12 RM', percent: 65, sets: 28, color: 'bg-violet-500', shadow: 'shadow-violet-500/50' },
+            { id: 'endu', label: 'ENDURANCE', range: '15+ RM', percent: 20, sets: 11, color: 'bg-cyan-500', shadow: 'shadow-cyan-500/50' },
+        ];
+
+        const MUSCLES_TURBINE = [
+            { id: 'm1', name: 'PECTORAUX', volume: 2101, color: '#22d3ee' },
+            { id: 'm2', name: 'DOS', volume: 2341, color: '#3b82f6' },
+            { id: 'm3', name: 'JAMBES', volume: 2333, color: '#8b5cf6' },
+            { id: 'm4', name: 'EPAULES', volume: 3151, color: '#d946ef' },
+            { id: 'm5', name: 'BRAS', volume: 3015, color: '#f43f5e' },
+            { id: 'm6', name: 'ABDOS', volume: 1200, color: '#10b981' },
+        ];
+
+        const MUSCLES_HUD = [
+            { id: '1', name: 'PECS', sets: 12, volume: 2101, type: 'primary', normalized: 0.9, intensity: 8.5, recovery: 45 },
+            { id: '2', name: 'DOS', sets: 16, volume: 2341, type: 'primary', normalized: 1.0, intensity: 9.2, recovery: 80 },
+            { id: '3', name: 'JAMBES', sets: 14, volume: 2333, type: 'primary', normalized: 0.95, intensity: 9.5, recovery: 30 },
+            { id: '4', name: 'EPAULES', sets: 10, volume: 3151, type: 'primary', normalized: 0.85, intensity: 7.8, recovery: 90 },
+            { id: '5', name: 'BRAS', sets: 8, volume: 3015, type: 'primary', normalized: 0.8, intensity: 8.0, recovery: 95 },
+            { id: '6', name: 'ABS', sets: 6, volume: 800, type: 'secondary', normalized: 0.6, intensity: 6.0, recovery: 100 },
+        ];
+
+        const WEEKLY_DATA = [
+            { id: 's1', label: 'SEM 1', phase: 'ACTIVATION', volume: 28500, intensity: 75, rpeAvg: 7.5, effectiveReps: 140, fatigue: 40, status: 'success', angle: 225, color: '#22d3ee' },
+            { id: 's2', label: 'SEM 2', phase: 'ACCUMULATION', volume: 31200, intensity: 78, rpeAvg: 8.0, effectiveReps: 165, fatigue: 55, status: 'success', angle: 315, color: '#8b5cf6' },
+            { id: 's3', label: 'SEM 3', phase: 'PEAK LOAD', volume: 33400, intensity: 85, rpeAvg: 8.5, effectiveReps: 190, fatigue: 75, status: 'active', angle: 45, color: '#d946ef' },
+            { id: 's4', label: 'SEM 4', phase: 'OVERREACH', volume: 35000, intensity: 90, rpeAvg: 9.5, effectiveReps: 210, fatigue: 92, status: 'locked', angle: 135, color: '#ef4444' }
+        ];
+
+        // --- COMPONENTS ---
+
+        // 1. NEON TRACKER V7 (Hybrid Fighter)
+        const NeonTracker = ({ score, sessions, sets, status }) => {
+            const canvasRef = useRef(null);
+            const containerRef = useRef(null);
+            const [showInfo, setShowInfo] = useState(false);
+            const animState = useRef({ sessions: 0, sets: 0, score: 0, rotation: 0, pulse: 0 });
+            const particles = useRef([]);
+
+            const statsGrid = [
+                { label: 'HRV', value: '72ms', icon: Zap, color: 'cyan' },
+                { label: 'KCAL', value: '3420', icon: Flame, color: 'orange' },
+                { label: 'FOCUS', value: '94%', icon: Target, color: 'purple' },
+                { label: 'LOAD', value: '68%', icon: TrendingUp, color: 'green' },
+                { label: 'RANK', value: '#12', icon: Award, color: 'yellow' },
+                { label: 'RECO', value: '88%', icon: Shield, color: 'blue' },
+            ];
+
+            useEffect(() => {
+                if (particles.current.length === 0) {
+                    for(let i=0; i<40; i++) {
+                        particles.current.push({
+                            x: 0, y: 0,
+                            r: Math.random() * 1.5,
+                            speed: 0.005 + Math.random() * 0.01,
+                            angle: Math.random() * Math.PI * 2,
+                            dist: 0.4 + Math.random() * 0.5,
+                        });
+                    }
+                }
+            }, []);
+
+            useEffect(() => {
+                const canvas = canvasRef.current; if (!canvas) return;
+                const ctx = canvas.getContext('2d', { alpha: true }); if (!ctx) return;
+                let animationId;
+
+                const handleResize = () => {
+                    if (!containerRef.current || !canvas) return;
+                    const dpr = window.devicePixelRatio || 1;
+                    const rect = containerRef.current.getBoundingClientRect();
+                    const size = rect.width;
+                    canvas.width = size * dpr; canvas.height = size * dpr;
+                    canvas.style.width = `${size}px`; canvas.style.height = `${size}px`;
+                    ctx.scale(dpr, dpr);
+                };
+                window.addEventListener('resize', handleResize); setTimeout(handleResize, 0);
+
+                const toRad = (deg) => (deg * Math.PI) / 180;
+
+                const draw = () => {
+                    if (!canvas) return;
+                    const lerp = (start, end, factor) => start + (end - start) * factor;
+                    animState.current.sessions = lerp(animState.current.sessions, sessions.current / sessions.max, 0.05);
+                    animState.current.sets = lerp(animState.current.sets, sets.current / sets.max, 0.05);
+                    animState.current.score = lerp(animState.current.score, score / 100, 0.04);
+                    animState.current.rotation += 0.002;
+                    animState.current.pulse = (Math.sin(Date.now() / 500) + 1) * 0.5;
+
+                    const size = canvas.width / (window.devicePixelRatio || 1);
+                    const cx = size / 2; const cy = size / 2; const r = size * 0.40;
+
+                    ctx.clearRect(0, 0, size, size);
+                    ctx.globalCompositeOperation = 'screen';
+
+                    ctx.save(); ctx.strokeStyle = 'rgba(217, 70, 239, 0.1)'; ctx.lineWidth = 1; ctx.beginPath();
+                    for(let i=0; i<5; i++) { ctx.ellipse(cx, cy, r*1.1, r*0.6, (i * Math.PI/2.5) + animState.current.rotation, 0, Math.PI * 2); }
+                    ctx.stroke(); ctx.restore();
+
+                    const drawFighterRing = (radius, width, progress, hueStart, hueEnd) => {
+                        const startAngle = toRad(145); const totalAngle = toRad(250); const endAngle = startAngle + (totalAngle * progress);
+                        ctx.save(); ctx.lineCap = 'round';
+                        const gradient = ctx.createLinearGradient(cx - radius, cy, cx + radius, cy);
+                        gradient.addColorStop(0, `hsl(${hueStart}, 100%, 50%)`); gradient.addColorStop(1, `hsl(${hueEnd}, 100%, 60%)`);
+                        ctx.beginPath(); ctx.arc(cx, cy, radius, startAngle, startAngle + totalAngle); ctx.lineWidth = width; ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)'; ctx.stroke();
+                        ctx.shadowBlur = 20; ctx.shadowColor = `hsl(${hueEnd}, 100%, 50%)`;
+                        ctx.beginPath(); ctx.arc(cx, cy, radius, startAngle, endAngle); ctx.lineWidth = width; ctx.strokeStyle = gradient; ctx.stroke();
+                        ctx.shadowBlur = 5; ctx.lineWidth = width * 0.3; ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'; ctx.stroke();
+                        ctx.restore();
+                    };
+
+                    drawFighterRing(r * 1.0, size * 0.035, animState.current.sessions, 240, 260);
+                    drawFighterRing(r * 0.85, size * 0.035, animState.current.sets, 310, 340);
+                    drawFighterRing(r * 0.70, size * 0.035, animState.current.score, 30, 50);
+
+                    ctx.save();
+                    particles.current.forEach(p => {
+                        p.angle += p.speed;
+                        const xRadius = r * 0.8 * p.dist; const yRadius = r * 0.8 * p.dist;
+                        const px = cx + Math.cos(p.angle) * xRadius; const py = cy + Math.sin(p.angle) * yRadius;
+                        const scale = 0.5 + (Math.sin(p.angle * 2) + 1) * 0.5;
+                        ctx.beginPath(); ctx.arc(px, py, p.r * scale, 0, Math.PI * 2); ctx.fillStyle = `rgba(255, 255, 255, ${scale * 0.8})`; ctx.fill();
+                    });
+                    ctx.restore();
+                    animationId = requestAnimationFrame(draw);
+                };
+                draw();
+                return () => { window.removeEventListener('resize', handleResize); cancelAnimationFrame(animationId); };
+            }, [sessions, sets, score]);
+
+            return (
+                <div className="relative w-full max-w-md bg-[#020202] border border-white/10 rounded-3xl flex flex-col overflow-hidden shadow-2xl transition-all hover:border-white/20 group">
+                    <div className="relative h-[440px] w-full bg-gradient-to-b from-[#050505] to-[#020202] border-b border-white/10">
+                        <div className="absolute top-0 left-0 w-full p-5 flex justify-between items-center z-20">
+                            <div className="flex items-center gap-2"><Crosshair className="text-cyan-400 animate-spin-slow" size={20} /><h2 className="font-display font-bold text-white tracking-[0.2em] uppercase text-lg">FIGHTER.HUD</h2></div>
+                            <div className="flex gap-2">
+                                <button onClick={() => setShowInfo(!showInfo)} className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-cyan-400 hover:bg-white/10 transition-colors">{showInfo ? <X size={14} /> : <Info size={14} />}</button>
+                                <div className="px-3 py-1 border border-green-500/50 bg-green-500/10 text-green-400 text-[10px] font-black tracking-widest rounded uppercase animate-pulse flex items-center">READY</div>
+                            </div>
+                        </div>
+                        <div className="absolute top-12 left-5 z-20 flex items-center gap-2"><div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div><span className="text-[10px] text-cyan-400 font-mono font-bold tracking-widest">LIVE TELEMETRY</span></div>
+                        <div className="absolute inset-0 flex items-center justify-center pt-12" ref={containerRef}><canvas ref={canvasRef} className="w-full h-full relative z-10" style={{ mixBlendMode: 'screen' }} /></div>
+                        <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none pt-12">
+                            <div className="flex flex-col items-center justify-center mt-4">
+                                <div className="text-[10px] text-white font-black tracking-[0.4em] mb-1 uppercase drop-shadow-[0_0_5px_rgba(255,255,255,0.8)] animate-pulse">TARGET LOCKED</div>
+                                <div className="text-8xl font-display font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-100 to-yellow-500 drop-shadow-[0_0_25px_rgba(234,179,8,0.5)] tracking-tighter leading-none">{Math.round(score)}</div>
+                                <div className="h-1 w-16 bg-cyan-500 rounded-full mt-4 shadow-[0_0_10px_#06b6d4]"></div>
+                            </div>
+                        </div>
+                        <div className="absolute top-[55%] left-4 -translate-y-1/2 z-30">
+                            <div className="bg-[#0f0a1a] border border-indigo-500/40 p-3 rounded-xl shadow-[0_0_20px_rgba(99,102,241,0.2)] flex flex-col items-center w-20 backdrop-blur-sm">
+                                <div className="text-[9px] font-bold text-indigo-400 mb-1 flex items-center gap-1"><Repeat size={10}/> FREQ</div>
+                                <div className="text-2xl font-display font-bold text-white leading-none">{sessions.current}<span className="text-[10px] text-gray-500 font-mono">/{sessions.max}</span></div>
+                            </div>
+                        </div>
+                        <div className="absolute top-[55%] right-4 -translate-y-1/2 z-30">
+                            <div className="bg-[#1a0b1a] border border-fuchsia-500/40 p-3 rounded-xl shadow-[0_0_20px_rgba(217,70,239,0.2)] flex flex-col items-center w-20 backdrop-blur-sm">
+                                <div className="text-[9px] font-bold text-fuchsia-400 mb-1 flex items-center gap-1"><Layers size={10}/> VOL</div>
+                                <div className="text-2xl font-display font-bold text-white leading-none">{sets.current}<span className="text-[10px] text-gray-500 font-mono">/{sets.max}</span></div>
+                            </div>
+                        </div>
+                        {showInfo && (
+                            <div className="absolute inset-0 z-40 bg-black/80 backdrop-blur-md flex flex-col justify-center items-center p-8 animate-fade-in text-center">
+                                <h3 className="text-xl font-display font-bold text-white mb-6 tracking-widest border-b border-white/20 pb-2">LEGEND</h3>
+                                <div className="space-y-6 w-full">
+                                    <div className="flex items-center gap-4"><div className="w-12 h-12 rounded-full border-4 border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.5)] flex items-center justify-center"><Repeat size={20} className="text-indigo-400"/></div><div className="text-left"><div className="text-indigo-400 font-bold text-sm tracking-wider">FREQUENCY</div><div className="text-[10px] text-gray-400">Weekly Sessions / Goal</div></div></div>
+                                    <div className="flex items-center gap-4"><div className="w-12 h-12 rounded-full border-4 border-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.5)] flex items-center justify-center"><Layers size={20} className="text-fuchsia-400"/></div><div className="text-left"><div className="text-fuchsia-400 font-bold text-sm tracking-wider">VOLUME</div><div className="text-[10px] text-gray-400">Total Sets / Capacity</div></div></div>
+                                    <div className="flex items-center gap-4"><div className="w-12 h-12 rounded-full border-4 border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.5)] flex items-center justify-center"><Target size={20} className="text-yellow-400"/></div><div className="text-left"><div className="text-yellow-400 font-bold text-sm tracking-wider">INTENSITY</div><div className="text-[10px] text-gray-400">Global Performance Score</div></div></div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <div className="bg-[#080808] p-5 border-t border-white/5 relative z-10">
+                        <div className="grid grid-cols-3 gap-3 mb-6">
+                            {statsGrid.map((stat, i) => (<GridCard key={i} stat={stat} />))}
+                        </div>
+                        <div className="relative pt-1">
+                            <div className="flex justify-between items-end mb-2"><span className="text-xs font-bold text-cyan-400 tracking-widest uppercase">XP LEVEL 24</span><span className="text-[10px] font-mono text-gray-500">1850 / 2500</span></div>
+                            <div className="h-2 w-full bg-[#1a1a1a] rounded-full overflow-hidden border border-white/5"><div className="h-full bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 w-[75%] shadow-[0_0_15px_rgba(6,182,212,0.6)]"></div></div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const GridCard = ({ stat }) => {
+            const styles = {
+                cyan: { border: 'border-cyan-500/40', text: 'text-cyan-400', shadow: 'shadow-[0_0_15px_rgba(6,182,212,0.1)]' },
+                orange: { border: 'border-orange-500/40', text: 'text-orange-400', shadow: 'shadow-[0_0_15px_rgba(249,115,22,0.1)]' },
+                purple: { border: 'border-purple-500/40', text: 'text-purple-400', shadow: 'shadow-[0_0_15px_rgba(168,85,247,0.1)]' },
+                green: { border: 'border-green-500/40', text: 'text-green-400', shadow: 'shadow-[0_0_15px_rgba(34,197,94,0.1)]' },
+                yellow: { border: 'border-yellow-500/40', text: 'text-yellow-400', shadow: 'shadow-[0_0_15px_rgba(234,179,8,0.1)]' },
+                blue: { border: 'border-blue-500/40', text: 'text-blue-400', shadow: 'shadow-[0_0_15px_rgba(59,130,246,0.1)]' },
+            };
+            const s = styles[stat.color];
+            return (
+                <div className={`flex flex-col items-center justify-center p-3 rounded-xl border bg-[#0a0a0a] transition-all hover:-translate-y-1 ${s.border} ${s.shadow}`}>
+                    <div className={`mb-2 ${s.text} opacity-90`}><stat.icon size={16} /></div>
+                    <div className="text-xl font-display font-bold text-white leading-none mb-1">{stat.value}</div>
+                    <div className={`text-[9px] font-black uppercase tracking-widest opacity-60 ${s.text}`}>{stat.label}</div>
+                </div>
+            );
+        };
+
+        // 2. WEEKLY PROGRESS V14 (Ultimate Kinetic Hypertrophy)
+        const WeeklyProgress = () => {
+            const [activeWeek, setActiveWeek] = useState(WEEKLY_DATA[2]);
+            const [scanAngle, setScanAngle] = useState(0);
+            const [showInfo, setShowInfo] = useState(false);
+            const [shockwaves, setShockwaves] = useState([]);
+            const canvasRef = useRef(null);
+
+            useEffect(() => {
+                const interval = setInterval(() => setScanAngle(prev => (prev + 1.5) % 360), 20);
+                return () => clearInterval(interval);
+            }, []);
+
+            useEffect(() => {
+                const canvas = canvasRef.current; if (!canvas) return;
+                const ctx = canvas.getContext('2d'); if (!ctx) return;
+                const particles = [];
+                for(let i=0; i<30; i++) particles.push({ x: 0, y: 0, r: Math.random() * 1.5, speed: 0.002 + Math.random() * 0.005, angle: Math.random() * Math.PI * 2, dist: 0.3 + Math.random() * 0.7 });
+                
+                let animId;
+                const animate = () => {
+                    const size = 380; ctx.clearRect(0, 0, size, size); const cx = size / 2; const cy = size / 2; const rBase = size * 0.45;
+                    particles.forEach(p => {
+                        p.angle += p.speed; const x = cx + Math.cos(p.angle) * (rBase * p.dist); const y = cy + Math.sin(p.angle) * (rBase * p.dist);
+                        ctx.fillStyle = `rgba(255, 255, 255, ${0.1 + Math.random() * 0.3})`; ctx.beginPath(); ctx.arc(x, y, p.r, 0, Math.PI * 2); ctx.fill();
+                    });
+                    animId = requestAnimationFrame(animate);
+                };
+                animate(); return () => cancelAnimationFrame(animId);
+            }, []);
+
+            const handleNodeClick = (x, y, week) => {
+                setActiveWeek(week);
+                const newWave = { id: Date.now(), x, y, color: week.color };
+                setShockwaves(prev => [...prev, newWave]);
+                setTimeout(() => setShockwaves(prev => prev.filter(w => w.id !== newWave.id)), 1000);
+            };
+
+            const getRadius = (i) => 15 + (i * 11);
+            const getCoord = (angle, radius) => { const rad = (angle - 90) * Math.PI / 180; return { x: 50 + radius * Math.cos(rad), y: 50 + radius * Math.sin(rad) }; };
+            const points = WEEKLY_DATA.map((w, i) => getCoord(w.angle, getRadius(i)));
+            const pathData = `M ${points.map(p => `${p.x},${p.y}`).join(' L ')}`;
+
+            return (
+                <div className="relative w-full max-w-md bg-[#050505] border border-white/10 rounded-3xl flex flex-col transition-all duration-500 hover:border-cyan-500/20 hover:shadow-[0_0_60px_rgba(6,182,212,0.15)] z-20 overflow-hidden group min-h-[750px]">
+                    <div className="bg-[#050505] px-6 py-4 border-b border-white/10 z-10 flex justify-between items-center relative overflow-hidden">
+                        <div className="absolute inset-0 bg-cyan-900/5"></div>
+                        <div>
+                            <h2 className="font-display font-black text-white tracking-widest uppercase flex items-center gap-2 text-lg"><Crosshair className="text-cyan-400 animate-[spin_10s_linear_infinite]" size={18} /> KINETIC.RADAR</h2>
+                            <p className="text-[10px] text-cyan-500/80 font-mono font-bold mt-1 flex items-center gap-1 animate-pulse">HYPERTROPHY TRACKING ACTIVE</p>
+                        </div>
+                        <button onClick={() => setShowInfo(!showInfo)} className="relative z-10 w-8 h-8 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500 transition-all">{showInfo ? <X size={14} /> : <Info size={14} />}</button>
+                    </div>
+                    <div className="relative bg-[#020202] flex items-center justify-center p-2 h-[380px] overflow-hidden">
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(6,182,212,0.08)_0%,_transparent_70%)]"></div>
+                        <canvas ref={canvasRef} width={380} height={380} className="absolute inset-0 w-full h-full pointer-events-none opacity-60" />
+                        {shockwaves.map(wave => (<div key={wave.id} className="absolute border rounded-full animate-ping pointer-events-none" style={{ left: `${wave.x}%`, top: `${wave.y}%`, width: '20px', height: '20px', transform: 'translate(-50%, -50%)', opacity: 0, borderColor: wave.color }} />))}
+                        <svg className="relative w-full aspect-square max-w-[380px] z-10 overflow-visible" viewBox="0 0 100 100">
+                            <defs>
+                                <linearGradient id="radarBeamV14" x1="0.5" y1="0.5" x2="1" y2="0.5" gradientTransform={`rotate(${scanAngle}, 0.5, 0.5)`}><stop offset="0%" stopColor="rgba(34, 211, 238, 0)" /><stop offset="100%" stopColor="rgba(34, 211, 238, 0.15)" /></linearGradient>
+                                <filter id="glowPathV14"><feGaussianBlur stdDeviation="0.6" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                            </defs>
+                            <circle cx="50" cy="50" r="48" fill="url(#radarBeamV14)" className="pointer-events-none" />
+                            {WEEKLY_DATA.map((week, i) => {
+                                const r = getRadius(i); const animSpeed = 25 + (i * 10); const animDir = i % 2 === 0 ? '' : 'reverse'; const isActive = activeWeek.id === week.id;
+                                return (<g key={`ring-${i}`} className="origin-center" style={{ animation: `spin ${animSpeed}s linear infinite ${animDir}` }}><circle cx="50" cy="50" r={r} fill="none" stroke={week.color} strokeWidth="0.3" strokeDasharray={isActive ? 'none' : '2 4'} opacity={isActive ? 0.8 : 0.2} />{isActive && <circle cx="50" cy={50 - r} r="0.8" fill={week.color} opacity="0.8" />}</g>);
+                            })}
+                            <g opacity="0.1" stroke="#fff" strokeWidth="0.2"><line x1="50" y1="0" x2="50" y2="100" /><line x1="0" y1="50" x2="100" y2="50" /></g>
+                            <path d={pathData} fill="none" stroke="#22d3ee" strokeWidth="1" filter="url(#glowPathV14)" strokeDasharray="200" className="transition-all duration-[2000ms] ease-out opacity-40" />
+                            {WEEKLY_DATA.map((week, i) => {
+                                const pos = points[i]; const isSelected = activeWeek.id === week.id;
+                                return (
+                                    <g key={week.id} onClick={() => handleNodeClick(pos.x, pos.y, week)} className="cursor-pointer group">
+                                        {isSelected && (<circle cx={pos.x} cy={pos.y} r="6" fill="none" stroke={week.color} strokeWidth="0.3" opacity="0.5"><animate attributeName="r" values="3;8;3" dur="2s" repeatCount="indefinite" /><animate attributeName="opacity" values="0.8;0;0.8" dur="2s" repeatCount="indefinite" /></circle>)}
+                                        <circle cx={pos.x} cy={pos.y} r={isSelected ? 4 : 2.5} fill={isSelected ? '#fff' : '#000'} stroke={week.color} strokeWidth={1.5} className="transition-all duration-300 ease-out" />
+                                    </g>
+                                );
+                            })}
+                        </svg>
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none">
+                            <div className="text-[8px] font-mono text-gray-500 uppercase tracking-widest mb-1">RPE AVG</div>
+                            <div className="text-4xl font-black text-white leading-none drop-shadow-lg" style={{color: activeWeek.color}}>{activeWeek.rpeAvg}</div>
+                        </div>
+                        {showInfo && (
+                            <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-md p-6 flex flex-col justify-center animate-fade-in">
+                                <h3 className="text-white font-display font-bold text-lg mb-4 border-b border-white/20 pb-2">GLOSSAIRE</h3>
+                                <div className="space-y-3">
+                                    <InfoItem label="RPE (Effort)" desc="Difficulté perçue sur 10. Cible: 8-9." color="text-yellow-400" />
+                                    <InfoItem label="EFF. REPS" desc="Répétitions proches de l'échec." color="text-fuchsia-400" />
+                                    <InfoItem label="FATIGUE" desc="Impact nerveux. Danger si > 90%." color="text-red-400" />
+                                </div>
+                                <div className="mt-6 text-center text-xs text-gray-500 font-mono">tap to close</div>
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex-1 bg-[#0a0a0a] border-t border-white/10 p-5 relative z-10">
+                        <div className="flex justify-between items-center mb-4">
+                            <div className="flex items-center gap-3"><div className="w-1.5 h-8 rounded-full" style={{backgroundColor: activeWeek.color, boxShadow: `0 0 10px ${activeWeek.color}`}}></div><div><h3 className="text-white font-display font-bold text-xl tracking-wide leading-none">{activeWeek.label}</h3><p className="text-[10px] font-mono uppercase mt-1" style={{color: activeWeek.color}}>{activeWeek.phase}</p></div></div>
+                            <div className="text-right"><div className="text-2xl font-black text-white">{(activeWeek.volume / 1000).toFixed(1)}<span className="text-sm text-gray-600">k</span></div><div className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Volume</div></div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3 mb-4">
+                            <StatBox label="RPE Avg" value={activeWeek.rpeAvg} sub="/ 10" icon={Gauge} color={activeWeek.rpeAvg > 8 ? "text-yellow-400" : "text-white"} barColor={activeWeek.rpeAvg > 8 ? "bg-yellow-500" : "bg-blue-500"} progress={activeWeek.rpeAvg * 10} />
+                            <StatBox label="Eff. Reps" value={activeWeek.effectiveReps} sub="Total" icon={Dumbbell} color="text-fuchsia-400" barColor="bg-fuchsia-500" progress={(activeWeek.effectiveReps / 250) * 100} />
+                            <StatBox label="Fatigue" value={`${activeWeek.fatigue}%`} sub="Systemic" icon={Activity} color={activeWeek.fatigue > 80 ? "text-red-500" : "text-emerald-400"} barColor={activeWeek.fatigue > 80 ? "bg-red-500" : "bg-emerald-500"} progress={activeWeek.fatigue} />
+                        </div>
+                        <div className="bg-white/5 border border-white/5 rounded-lg p-3 flex items-start gap-3"><Zap className="text-yellow-400 shrink-0 mt-0.5" size={14} /><div className="text-xs text-gray-300 leading-relaxed">{activeWeek.rpeAvg > 8.5 ? "Haute intensité détectée. Le stimulus hypertrophique est maximal, mais surveillez la récupération nerveuse." : "Volume d'accumulation solide. Vous êtes dans la zone optimale pour la croissance métabolique."}</div></div>
+                    </div>
+                </div>
+            );
+        };
+
+        const InfoItem = ({ label, desc, color }) => (<div className="flex gap-3"><div className={`w-1 h-full rounded-full bg-current opacity-50 ${color}`}></div><div><div className={`font-bold text-sm ${color} mb-0.5`}>{label}</div><div className="text-xs text-gray-400 leading-snug">{desc}</div></div></div>);
+        const StatBox = ({ label, value, sub, icon: Icon, color, barColor, progress }) => (<div className="bg-[#111] rounded-xl p-3 border border-white/5 relative overflow-hidden group hover:border-white/10 transition-all"><div className="flex justify-between items-start mb-2"><span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">{label}</span><Icon size={12} className="text-gray-600 group-hover:text-white transition-colors"/></div><div className={`text-lg font-display font-bold leading-none mb-2 ${color}`}>{value} <span className="text-[8px] text-gray-600 font-sans font-normal">{sub}</span></div><div className="h-1 w-full bg-gray-800 rounded-full overflow-hidden"><div className={`h-full rounded-full ${barColor}`} style={{width: `${progress}%`}}></div></div></div>);
+
+        // 7. MAIN APP
+        const App = () => {
+            const [loading, setLoading] = useState(true);
+            const [bootStep, setBootStep] = useState(0);
+            const [score, setScore] = useState(84);
+            const [sessions, setSessions] = useState(4);
+            const [sets, setSets] = useState(45);
+            const [volume, setVolume] = useState(18500);
+
+            useEffect(() => {
+                if (!loading) return;
+                const timeouts = [
+                    setTimeout(() => setBootStep(1), 500),
+                    setTimeout(() => setBootStep(2), 1200),
+                    setTimeout(() => setBootStep(3), 2000),
+                    setTimeout(() => setLoading(false), 2800),
+                ];
+                return () => timeouts.forEach(clearTimeout);
+            }, [loading]);
+
+            if (loading) {
+                return (
+                    <div className="fixed inset-0 bg-[#020202] text-cyan-500 font-mono z-50 flex flex-col items-center justify-center p-8 select-none">
+                        <div className="w-full max-w-[300px] flex flex-col gap-4">
+                            <div className="flex justify-between items-center border-b border-cyan-900/50 pb-2 mb-4"><span className="text-xs font-bold tracking-[0.2em] animate-pulse">NEON.FIT SYSTEM</span><Power size={14} className="animate-spin-slow"/></div>
+                            <div className="space-y-1 text-[10px] uppercase tracking-wider text-cyan-700">
+                                <div className={bootStep >= 0 ? 'text-cyan-400' : ''}>[ SYSTEM_BOOT ] ... OK</div>
+                                <div className={bootStep >= 1 ? 'text-cyan-400' : ''}>[ LOADING_MODULES ] ... V14 KINETIC</div>
+                                <div className={bootStep >= 3 ? 'text-cyan-400' : ''}>[ DISPLAY_READY ] ... 100%</div>
+                            </div>
+                            <div className="h-1 w-full bg-cyan-900/30 mt-8 relative overflow-hidden"><div className="absolute inset-y-0 left-0 bg-cyan-400 animate-slideIn"></div></div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-[#010101] text-white font-sans overflow-x-hidden relative pb-20">
+                    <header className="sticky top-0 left-0 w-full z-40 bg-[#010101]/90 backdrop-blur-lg border-b border-white/5 transition-all duration-300">
+                        <div className="max-w-md mx-auto px-4 py-4 flex justify-between items-center">
+                            <div><h1 className="font-display font-black text-xl tracking-tighter text-white flex items-center gap-1"><Fingerprint size={18} className="text-cyan-400" /> NEON<span className="text-cyan-400">.FIT</span></h1></div>
+                            <button onClick={() => setLoading(true)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-all"><RotateCcw size={14} /></button>
+                        </div>
+                    </header>
+                    <main className="relative z-10 w-full max-w-md mx-auto px-4 py-6 flex flex-col gap-8">
+                        <div className="animate-slideIn" style={{animationDelay: '0.1s'}}><NeonTracker score={score} sessions={{ current: sessions, max: 5 }} sets={{ current: sets, max: 60 }} status={score > 80 ? 'consistent' : 'warning'} /></div>
+                        <div className="animate-slideIn" style={{animationDelay: '0.2s'}}><WeeklyProgress /></div>
+                        <div className="space-y-6 animate-slideIn" style={{animationDelay: '0.3s'}}>
+                            <VolumeGauge volume={volume} maxVolume={25000} stats={{ sets: sets, tut: 2450, sessions: sessions }} />
+                            <MuscleWorkload />
+                            <MuscleHud />
+                            <IntensityZones />
+                        </div>
+                    </main>
+                    <footer className="fixed bottom-0 left-0 w-full bg-[#050505]/90 backdrop-blur border-t border-white/5 py-4 z-40">
+                        <div className="max-w-md mx-auto flex justify-center text-[10px] text-gray-600 font-mono tracking-widest uppercase">// SYSTEM OPTIMIZED //</div>
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
